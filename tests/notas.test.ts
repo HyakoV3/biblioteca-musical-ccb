@@ -107,11 +107,17 @@ describe("mesmasNotas", () => {
 });
 
 describe("ligadura: a luz corre pela curva", () => {
-  const curva = (t: string, f: string) => ({ nome: "curva", getAttribute: (n: string) => (n === "data-t" ? t : n === "data-f" ? f : n === "class" ? "tie" : null) });
+  const curva = (t: string, f: string, classe = "tie") => ({ nome: "curva", getAttribute: (n: string) => (n === "data-t" ? t : n === "data-f" ? f : n === "class" ? classe : null) });
 
   it("a curva com tempo é indexada como ligadura, e a nota comum não leva a marca", () => {
     const m = indexarNotas([medida(el("a", "0", "2") as never, curva("0", "2") as never)]);
     expect(m[0].map((n) => n.ligadura ?? false)).toEqual([false, true]);
+  });
+
+  it("a ligadura de EXPRESSÃO (g.slur) também é indexada como curva, no seu tempo", () => {
+    const m = indexarNotas([medida(el("a", "0", "2") as never, curva("0", "3", "slur") as never)]);
+    expect(m[0].map((n) => n.ligadura ?? false)).toEqual([false, true]);
+    expect(m[0][1]).toMatchObject({ t: 0, f: 3 });
   });
 
   it("só curvas não contam como 'partitura com tempo por nota' (sem notas ficaria sem halo e sem fundo)", () => {

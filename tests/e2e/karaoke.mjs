@@ -54,7 +54,7 @@ const NOTAS_DO_COMPASSO = [
   [["m1n0", 0, 4], ["m1n1", 0, 2]],
   [["m2p0", 0, 2, "rest"]],
 ];
-const SVG_PARTITURA = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" overflow="hidden"><svg class="definition-scale" color="black" viewBox="0 0 400 120"><g id="bm-p-folha">${[20, 35, 50, 65, 80].map((y) => `<path d="M10 ${y} L390 ${y}"></path>`).join("")}<ellipse cx="60" cy="50" rx="10" ry="7"></ellipse><rect x="90" y="30" width="6" height="40"></rect><text x="120" y="110" font-family="Leipzig" font-size="30px">&#xE1D5; = 58</text>${[10, 130, 250].map((x, i) => `<g class="measure" id="bm-p-m${i}"><path d="M${x} 20 L${x} 80"></path><path d="M${x + 120} 20 L${x + 120} 80"></path>${NOTAS_DO_COMPASSO[i].map(([id, ini, fim, tipo], k) => tipo === "rest" ? `<g class="rest" id="bm-p-${id}" data-t="${ini}" data-f="${fim}"><rect x="${x + 20}" y="45" width="14" height="6"></rect></g>` : `<g class="note" id="bm-p-${id}" data-t="${ini}" data-f="${fim}"><g class="notehead"><ellipse cx="${x + 20 + 30 * k}" cy="${55 + 10 * k}" rx="8" ry="6"></ellipse></g><rect x="${x + 27 + 30 * k}" y="${25 + 10 * k}" width="2" height="30"></rect></g>`).join("")}${i === 0 ? '<g class="tie" id="bm-p-lig0" data-t="0" data-f="2"><path d="M28 70 C45 82 65 82 88 70 C65 88 45 88 28 70"></path></g>' : ""}</g>`).join("")}</g></svg></svg>`;
+const SVG_PARTITURA = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120" overflow="hidden"><svg class="definition-scale" color="black" viewBox="0 0 400 120"><g id="bm-p-folha">${[20, 35, 50, 65, 80].map((y) => `<path d="M10 ${y} L390 ${y}"></path>`).join("")}<ellipse cx="60" cy="50" rx="10" ry="7"></ellipse><rect x="90" y="30" width="6" height="40"></rect><text x="120" y="110" font-family="Leipzig" font-size="30px">&#xE1D5; = 58</text>${[10, 130, 250].map((x, i) => `<g class="measure" id="bm-p-m${i}"><path d="M${x} 20 L${x} 80"></path><path d="M${x + 120} 20 L${x + 120} 80"></path>${NOTAS_DO_COMPASSO[i].map(([id, ini, fim, tipo], k) => tipo === "rest" ? `<g class="rest" id="bm-p-${id}" data-t="${ini}" data-f="${fim}"><rect x="${x + 20}" y="45" width="14" height="6"></rect></g>` : `<g class="note" id="bm-p-${id}" data-t="${ini}" data-f="${fim}"><g class="notehead"><ellipse cx="${x + 20 + 30 * k}" cy="${55 + 10 * k}" rx="8" ry="6"></ellipse></g><rect x="${x + 27 + 30 * k}" y="${25 + 10 * k}" width="2" height="30"></rect></g>`).join("")}${i === 0 ? '<g class="tie" id="bm-p-lig0" data-t="0" data-f="2"><path d="M28 70 C45 82 65 82 88 70 C65 88 45 88 28 70"></path></g><g class="slur" id="bm-p-exp0" data-t="0" data-f="2"><path d="M28 64 C44 48 72 40 96 38 C74 46 46 60 28 64"></path></g>' : ""}</g>`).join("")}</g></svg></svg>`;
 // A versão de paisagem é outro desenho (marcado com data-largo, para saber qual foi entregue).
 const SVG_PARTITURA_PAISAGEM = SVG_PARTITURA.replace('id="bm-p-folha"', 'id="bm-p-folha" data-largo="1"');
 // Sílabas esperadas na 1ª vez (estrofe 1) e na 2ª (estrofe 2), com o início de cada uma em batidas.
@@ -748,6 +748,14 @@ async function principal() {
     return { faixaAtras: !!f && !!f.nextElementSibling && f.nextElementSibling.tagName.toLowerCase() === 'path' && !f.nextElementSibling.getAttribute('class'),
       pontoX: pt ? Number(pt.getAttribute('cx')) : -1, tem: !!c, largura: r ? Number(r.getAttribute('width')) : -1, noRecorte: !!c && c.getAttribute('clip-path').startsWith('url(#recorte-ligadura-') };
   })()`);
+  // A ligadura de EXPRESSÃO (g.slur, a curva inclinada entre notas de alturas diferentes) anima como a de prolongamento: também ganha a luz e o ponto, e o ponto SOBE junto da curva.
+  const expressao = () => av(`(() => {
+    const cs = [...document.querySelectorAll('#painel-partitura path.destaque-ligadura')];
+    const rs = [...document.querySelectorAll('#painel-partitura clipPath rect')];
+    const ps = [...document.querySelectorAll('#painel-partitura circle.ponto-ligadura')];
+    return { curvas: cs.length, larguraDaSegunda: rs[1] ? Number(rs[1].getAttribute('width')) : -1, pontoDaSegunda: ps[1] ? [Number(ps[1].getAttribute('cx')), Number(ps[1].getAttribute('cy'))] : null };
+  })()`);
+  const sobre = [];
   // Tocando do começo, a luz corre: a largura do recorte da curva cresce de um quadro para o outro enquanto a 1ª nota soa.
   await buscar(".mini .busca-entrada", 0);
   await dormir(300);
@@ -757,6 +765,7 @@ async function principal() {
   let faixasAtras = true;
   for (let i = 0; i < 25; i++) {
     const c = await curva();
+    sobre.push(await expressao());
     if (c.tem) {
       larguras.push(c.largura);
       pontos.push(c.pontoX);
@@ -768,6 +777,11 @@ async function principal() {
   const cresce = larguras.length >= 3 && larguras.every((w, i) => i === 0 || w >= larguras[i - 1]) && larguras[larguras.length - 1] > larguras[0];
   confere(cresce, `a luz corre pela ligadura enquanto a 1ª nota soa (larguras do recorte): ${JSON.stringify(larguras)}`);
   confere(faixasAtras, "a faixa larga da ligadura fica ATRÁS da curva (logo antes dela)");
+  const comExpressao = sobre.filter((x) => x.curvas === 2 && x.pontoDaSegunda);
+  const largurasExp = comExpressao.map((x) => x.larguraDaSegunda);
+  confere(comExpressao.length >= 3 && largurasExp.every((w, i) => i === 0 || w >= largurasExp[i - 1]) && largurasExp[largurasExp.length - 1] > largurasExp[0], `a ligadura de expressão (g.slur) anima junto da de prolongamento: a luz dela cresce (larguras): ${JSON.stringify(largurasExp)}`);
+  const ys = comExpressao.map((x) => x.pontoDaSegunda[1]);
+  confere(ys.length >= 3 && ys[ys.length - 1] < ys[0] - 3, `o ponto da ligadura de expressão sobe junto da curva inclinada (y de ${ys[0]?.toFixed(1)} a ${ys[ys.length - 1]?.toFixed(1)})`);
   confere(pontos.length >= 3 && pontos.every((x, i) => i === 0 || x >= pontos[i - 1]) && pontos[pontos.length - 1] > pontos[0], `o ponto brilhante anda junto da luz, da esquerda para a direita: ${JSON.stringify(pontos.map((x) => Math.round(x)))}`);
   await buscar(".mini .busca-entrada", 1.6);
   await dormir(500);

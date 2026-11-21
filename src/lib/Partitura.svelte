@@ -175,6 +175,25 @@
     }
   }
 
+  /** O comprimento da 1ª curva de Bézier do traçado (a borda de ida da ligadura), ou nulo se o traçado não tem duas curvas. Mede um traçado de teste só com ela. */
+  function comprimentoDaIda(original: SVGPathElement): number | null {
+    const d = original.getAttribute("d") ?? "";
+    const primeira = d.indexOf("C");
+    const segunda = primeira < 0 ? -1 : d.indexOf("C", primeira + 1);
+    if (segunda < 0) return null;
+    const teste = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    teste.setAttribute("d", d.slice(0, segunda));
+    original.parentNode?.appendChild(teste); // medir exige o traçado no documento
+    try {
+      const c = teste.getTotalLength();
+      return Number.isFinite(c) && c > 0 ? c : null;
+    } catch {
+      return null;
+    } finally {
+      teste.remove();
+    }
+  }
+
   function destacarCurvas(curvas: Acesa<Element>[]) {
     const mesmas = curvas.length === curvasPedidas.length && curvas.every((c, i) => c.n === curvasPedidas[i]);
     if (!mesmas) {
@@ -214,11 +233,15 @@
         const meio: { x: number; y: number }[] = [];
         try {
           const total = original.getTotalLength();
+          // Onde a borda de ida termina e a de volta começa: o fim da 1ª das duas curvas de Bézier do desenho. A ligadura de expressão (inclinada) tem as duas bordas de comprimentos diferentes,
+          // e a metade do comprimento total misturaria as duas. Sem as duas curvas no traçado, vale a metade (a ligadura simples tem bordas iguais).
+          const corte = comprimentoDaIda(original) ?? total / 2;
           const ida: { x: number; y: number }[] = [];
           const volta: { x: number; y: number }[] = [];
           for (let i = 0; i <= 40; i++) {
-            const q = original.getPointAtLength((total * i) / 40);
-            (i <= 20 ? ida : volta).push({ x: q.x, y: q.y });
+            const dist = (total * i) / 40;
+            const q = original.getPointAtLength(dist);
+            (dist <= corte ? ida : volta).push({ x: q.x, y: q.y });
           }
           const crescente = (l: { x: number; y: number }[]) => [...l].sort((a, b) => a.x - b.x);
           const a = crescente(ida);

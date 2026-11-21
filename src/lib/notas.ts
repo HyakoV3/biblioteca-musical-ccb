@@ -11,7 +11,7 @@ const EPS = 1e-6;
 const COMPASSOS_PARA_TRAS = 4;
 
 export type TempoDaNota = { t: number; f: number };
-/** Uma nota, pausa ou ligadura (`ligadura: true`: a curva `g.tie`, por onde a luz corre do halo da primeira nota até a segunda). */
+/** Uma nota, pausa ou ligadura (`ligadura: true`: a curva `g.tie` (de prolongamento) ou `g.slur` (de expressão), por onde a luz corre do halo da primeira nota até a última). */
 export type NotaDoDesenho<E> = TempoDaNota & { el: E; ligadura?: boolean };
 
 /** Os dois atributos de uma nota, ou `null` se faltam ou não valem (não número, negativo, fim que não vem depois do começo). */
@@ -31,10 +31,11 @@ export function indexarNotas<E extends ComAtributos>(medidas: ArrayLike<Medida<E
   const saida: NotaDoDesenho<E>[][] = [];
   for (let i = 0; i < medidas.length; i++) {
     const lista: NotaDoDesenho<E>[] = [];
-    for (const el of Array.from(medidas[i].querySelectorAll("g.note[data-t], g.rest[data-t], g.tie[data-t]"))) {
+    for (const el of Array.from(medidas[i].querySelectorAll("g.note[data-t], g.rest[data-t], g.tie[data-t], g.slur[data-t]"))) {
       const tempo = lerTempo(el.getAttribute("data-t"), el.getAttribute("data-f"));
       if (!tempo) continue;
-      const ligadura = (el.getAttribute("class") ?? "").split(/\s+/).includes("tie");
+      const classes = (el.getAttribute("class") ?? "").split(/\s+/);
+      const ligadura = classes.includes("tie") || classes.includes("slur");
       lista.push(ligadura ? { ...tempo, el, ligadura } : { ...tempo, el });
     }
     saida.push(lista);

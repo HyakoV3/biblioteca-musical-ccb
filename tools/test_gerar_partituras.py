@@ -559,6 +559,45 @@ class MarcarNotas(unittest.TestCase):
         svg, _ = g.marcar_notas(self.SVG_LIGADURA, {"b": (0, 2)}, [("t1", "a", "b")])
         self.assertIn('<g id="t1" class="tie">', svg)
 
+    SVG_EXPRESSAO = (
+        '<g id="m1" class="measure"><g id="a" class="note"></g><g id="s1" class="slur"><path d="M0,0"/></g></g>'
+        '<g id="m2" class="measure"><g id="b" class="note"></g><g id="s2" class="slur"></g><g id="s3" class="slur"></g></g>'
+    )
+
+    def test_ligadura_de_expressao_leva_o_tempo_da_nota_que_abre_ate_o_comeco_da_que_fecha(self):
+        # a abre em 1 (dura 1), a curva corre até o começo de b, 3 semínimas depois: de 1 a 4 (e não de 1 a 2, o fim de a)
+        svg, n = g.marcar_notas(self.SVG_EXPRESSAO, {"a": (1, 2), "b": (0, 1)}, [("s1", "a", "b", 3)])
+        self.assertIn('<g id="s1" class="slur" data-t="1" data-f="4">', svg)
+        self.assertEqual(n, 2)
+
+    def test_ligadura_de_expressao_partida_pelo_fim_da_linha_divide_o_tempo(self):
+        svg, _ = g.marcar_notas(self.SVG_EXPRESSAO, {"a": (0, 1), "b": (0, 1)}, [("s2", "a", "b", 4), ("s3", "a", "b", 4)])
+        self.assertIn('<g id="s2" class="slur" data-t="0" data-f="2">', svg)
+        self.assertIn('<g id="s3" class="slur" data-t="2" data-f="4">', svg)
+
+    def test_ligadura_de_prolongamento_e_de_expressao_sobre_as_mesmas_notas_nao_dividem_o_tempo(self):
+        svg = (
+            '<g id="m1" class="measure"><g id="a" class="note"></g><g id="t1" class="tie"></g><g id="s1" class="slur"></g></g>'
+            '<g id="m2" class="measure"><g id="b" class="note"></g></g>'
+        )
+        # a ligadura (a abre em 0 e dura 1,5) e a de expressão (de a até o começo de b, 1,5 depois) cobrem as MESMAS duas notas: cada uma leva o tempo inteiro
+        svg, _ = g.marcar_notas(svg, {"a": (0, 1.5), "b": (0, 1)}, [("t1", "a", "b"), ("s1", "a", "b", 1.5)])
+        self.assertIn('<g id="t1" class="tie" data-t="0" data-f="1.5">', svg)
+        self.assertIn('<g id="s1" class="slur" data-t="0" data-f="1.5">', svg)
+
+    def test_ligadura_de_expressao_sem_duracao_conhecida_fica_sem_atributos(self):
+        svg, _ = g.marcar_notas(self.SVG_EXPRESSAO, {"a": (1, 2), "b": (0, 1)}, [])
+        self.assertIn('<g id="s1" class="slur">', svg)
+
+    def test_inicios_absolutos_atravessam_a_barra(self):
+        tm = [
+            {"qstamp": 0, "measureOn": "m1", "on": ["a"]},
+            {"qstamp": 4, "measureOn": "m2", "on": ["b"], "off": ["a"]},
+            {"qstamp": 6, "restsOn": ["p"], "off": ["b"]},
+        ]
+        self.assertEqual(g.inicios_absolutos(tm, lambda i: i), {"a": 0, "b": 4, "p": 6})
+        self.assertEqual(g.inicios_absolutos(tm, lambda i: {"b": "B"}.get(i, i)), {"a": 0, "B": 4, "p": 6})
+
     def test_ligadura_em_ciclo_nao_trava(self):
         svg, n = g.marcar_notas(self.SVG_LIGADURA, {"a": (0, 1), "b": (1, 2)}, [("t1", "a", "b"), ("t2", "b", "a")])
         self.assertEqual(n, 2)

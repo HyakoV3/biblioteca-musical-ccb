@@ -216,6 +216,10 @@ partir do `timemap` do Verovio; o app os soma ao início do compasso que toca (a
   **cresce da esquerda para a direita** enquanto ela soa, e o halo na 2ª nota quando ela começa (com "reduzir movimento", a curva aparece inteira). Pacotes até o 004 não têm
   isso: lá a **segunda** nota não leva tempo e a **primeira** tem o fim somado (`data-f` pode passar do fim do compasso, e o app mantém a nota acesa no compasso seguinte);
   o app lê os dois jeitos.
+- **Ligadura de expressão (pacote 007 em diante):** a curva **inclinada** que une notas de alturas diferentes (`<g class="slur">`) também leva `data-t`/`data-f`, do começo da nota onde
+  ela **abre** até o começo da nota onde ela **fecha** (e não até o fim da primeira: ela pode cobrir várias notas). O app a anima como a de prolongamento: a luz cresce da esquerda para
+  a direita e o ponto brilhante sobe e desce **junto do desenho inclinado**. A curva de prolongamento e a de expressão sobre as mesmas duas notas são curvas diferentes, cada uma com o tempo inteiro;
+  só os pedaços da **mesma espécie** partidos pelo fim da linha dividem o tempo. Nos pacotes até o 006 só a de prolongamento tinha tempo (a de expressão ficava parada), e o app lê os dois jeitos.
 - **Repetições:** o instante dentro do compasso é o mesmo em todas as passadas, então vale um só por elemento; quem decide a passada é a lista `compassos`.
 - **Como aparece:** o halo dourado atrás da nota (a nota fica na cor do tema); o compasso que toca ganha só um **contorno fino** e uma **barra dourada à esquerda** (como a barra da estrofe da vez na letra), **sem o fundo amarelo**, que apagava o halo.
 - **Sem os atributos** (um pacote de partituras antigo), o app destaca só o compasso, como antes. As partituras novas precisam de um **pacote novo**.

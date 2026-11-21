@@ -9,6 +9,14 @@ O pacote é um `.zip` só com `partituras/hino-<número>.svg` e, opcional, `part
 > mas quem decide quando (e se) publicar é o responsável, depois da resposta dele. Enquanto não houver pacote publicado, o manifesto
 > do app fica `"pacote": null` e o botão Baixar **não aparece**.
 
+## Estado publicado (2026-11-21)
+
+- **`partituras-007.zip`** (19.438.311 bytes, **18,5 MiB**, SHA-256 `3b70e4f8…5ec0`): **os 480 hinos**, retrato e paisagem (960 SVG). Igual ao 006 em tudo (notas, pausas, ligaduras de prolongamento e compassos: conferido
+  hino a hino contra o 006), **mais o tempo das ligaduras de expressão** (`<g class="slur">`): 1.460 curvas em 402 arquivos, todas com `data-t` e `data-f`. Era o defeito do hino 55 (e de outros): as curvas inclinadas
+  entre notas de alturas diferentes ficavam sem animação, enquanto as retas entre notas iguais animavam. Conferido: 960 arquivos, 0 sem tempo, 960 SVG aceitos pela limpeza do app, a montagem reproduz o mesmo SHA-256, subido à pasta
+  do servidor e baixado pelo link público com o mesmo SHA-256 (o app extrai o zip da pasta pelo nome). É o que o manifesto do app aponta (a partir do **APK 069**). Os 006 e anteriores **ficam**, para os APKs que apontam para eles.
+  **Para ver a animação num aparelho que já tem as partituras:** Ajustes → Remover e Baixar de novo (o Remover do hinário apaga também as partituras).
+
 ## Estado publicado (2026-11-20)
 
 - **Pasta no servidor:** `/mnt/downloads/BibliotecaMusicalPartituras/` (compartilhamento próprio, fora da dos sons). Tem **quatro** zips:

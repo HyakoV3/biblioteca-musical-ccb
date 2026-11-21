@@ -183,9 +183,10 @@ def versoes(largura: int, largura_paisagem: int | None):
 # Cada nota e cada pausa do SVG leva o instante em que soa, DENTRO do compasso, em semínimas (as mesmas "batidas" do hinário): `data-t` é o
 # começo e `data-f` o fim (I-26, karaokê por nota). O app lê estes dois atributos direto do elemento e os soma ao início do compasso que
 # toca (a lista `compassos` do hinário), então não precisa de mapa de ids nem de arquivo à parte. Cada nota tem o SEU tempo, inclusive a
-# segunda de uma ligadura (a curva, `<g class="tie">`, leva o tempo da nota que a abre: é por onde a luz corre até a segunda nota).
+# segunda de uma ligadura (a curva, `<g class="tie">`, leva o tempo da nota que a abre: é por onde a luz corre até a segunda nota). A ligadura de EXPRESSÃO
+# (`<g class="slur">`, a curva inclinada que une notas de alturas diferentes) também leva tempo: da nota onde ela abre até o começo da nota onde ela fecha.
 ELEMENTO_COM_TEMPO = re.compile(r'<g id="([^"]+)" class="(?:note|rest)">')
-LIGADURA_NO_SVG = re.compile(r'<g id="([^"]+)" class="tie">')
+LIGADURA_NO_SVG = re.compile(r'<g id="([^"]+)" class="(tie|slur)">')
 CASAS_DO_TEMPO = 4
 
 
@@ -219,12 +220,25 @@ def tempos_no_compasso(timemap: list, real) -> dict:
     return saida
 
 
+def inicios_absolutos(timemap: list, real) -> dict:
+    """Do `timemap`, o instante ABSOLUTO (em semínimas, desde o começo da peça) em que cada nota e pausa começa a soar, pelo id do desenho. Vale a primeira vez que o
+    elemento soa. Serve para medir a distância entre duas notas de uma ligadura de expressão, que pode atravessar a barra de compasso."""
+    saida: dict = {}
+    for e in timemap:
+        for chave in ("on", "restsOn"):
+            for id_ in e.get(chave, []):
+                saida.setdefault(real(id_), e["qstamp"])
+    return saida
+
+
 def marcar_notas(svg: str, tempos: dict, ligaduras: list) -> tuple:
     """O SVG com `data-t` e `data-f` em cada nota e pausa que tem tempo, e nas ligaduras. Devolve (svg, quantas notas e pausas foram marcadas).
     Cada nota acende no SEU tempo, inclusive a segunda de uma ligadura (o som é uma nota só, mas na partitura o halo acompanha a curva e depois
     preenche a segunda nota). `ligaduras` é uma lista de `(id do <g class="tie">, id da nota que abre, id da que fecha)`: a curva leva o tempo da
     nota que abre (de onde a luz parte até onde a segunda começa). Se a ligadura foi partida em duas pelo fim da linha, o tempo se divide em partes
-    iguais, na ordem. Sem tempo (nota sem evento) ou com duração zero (nota de enfeite): sem atributos, não acende."""
+    iguais, na ordem. Sem tempo (nota sem evento) ou com duração zero (nota de enfeite): sem atributos, não acende.
+    Uma ligadura de EXPRESSÃO vem com um 4º item, a duração (em semínimas) do começo da nota que abre ao começo da que fecha: a curva dela leva
+    `(início da nota que abre, início + duração)` (a duração, e não o fim da primeira nota)."""
     marcados = 0
 
     def troca(m):
@@ -241,14 +255,23 @@ def marcar_notas(svg: str, tempos: dict, ligaduras: list) -> tuple:
     svg = ELEMENTO_COM_TEMPO.sub(troca, svg)
 
     # a curva da ligadura: o tempo da nota que abre, dividido entre os pedaços da mesma ligadura
+    # O pedaço de uma ligadura partida pelo fim da linha só se junta aos da MESMA espécie: uma ligadura de prolongamento e uma de expressão sobre as mesmas duas notas
+    # são curvas diferentes, e dividir o tempo entre elas daria meio tempo a cada uma.
     pedacos = {}
-    for gid, de, ate in ligaduras:
-        pedacos.setdefault((de, ate), []).append(gid)
+    duracoes = {}
+    for item in ligaduras:
+        gid, de, ate = item[:3]
+        expressao = len(item) > 3
+        pedacos.setdefault((expressao, de, ate), []).append(gid)
+        if expressao:
+            duracoes[(de, ate)] = item[3]
     tempo_da_curva = {}
-    for (de, _), ids in pedacos.items():
+    for (expressao, de, ate), ids in pedacos.items():
         if de not in tempos:
             continue
         inicio, fim = tempos[de]
+        if expressao:
+            fim = inicio + duracoes[(de, ate)]  # expressão: até o começo da nota que fecha
         if fim - inicio <= 1e-6:
             continue
         passo = (fim - inicio) / len(ids)
@@ -275,11 +298,17 @@ def tempos_do_desenho(tk, svg: str, timemap: list) -> tuple:
                 copia_para_real[c] = r
     real = lambda i: copia_para_real.get(i, i)  # sem repetição o Verovio não devolve cópias: o id do timemap já é o do desenho
     ligaduras = []
+    absolutos = inicios_absolutos(timemap, real)
     for m in LIGADURA_NO_SVG.finditer(svg):
         a = tk.getElementAttr(m.group(1))
         inicio, fim = (a.get("startid") or "").lstrip("#"), (a.get("endid") or "").lstrip("#")
-        if inicio and fim:
-            ligaduras.append((m.group(1), real(inicio), real(fim)))
+        if not (inicio and fim):
+            continue
+        de, ate = real(inicio), real(fim)
+        if m.group(2) == "tie":
+            ligaduras.append((m.group(1), de, ate))
+        elif de in absolutos and ate in absolutos and absolutos[ate] - absolutos[de] > 1e-6:
+            ligaduras.append((m.group(1), de, ate, absolutos[ate] - absolutos[de]))  # expressão: a duração até a nota que fecha
     return tempos_no_compasso(timemap, real), ligaduras
 
 
